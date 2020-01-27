@@ -34,20 +34,46 @@ public class MotionMatching : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"CoreUObject",
-				"Engine",
-				"Slate",
-				"SlateCore",
-				// ... add private dependencies that you statically link with here ...	
-			}
+                "Core",
+                "CoreUObject",
+                "Json",
+                "Slate",
+                "SlateCore",
+                "Engine",
+                "InputCore",
+                "UnrealEd", // for FAssetEditorManager
+				"KismetWidgets",
+                "Kismet",  // for FWorkflowCentricApplication
+				"PropertyEditor",
+                "RenderCore",
+                "ContentBrowser",
+                "WorkspaceMenuStructure",
+                "EditorStyle",
+                "MeshPaint",
+                "EditorWidgets",
+                "Projects",
+                "MotionMatching",
+                "AnimGraph",
+                "BlueprintGraph",
+                "AssetRegistry",
+                "AdvancedPreviewScene",
+            }
 			);
-		
-		
-		DynamicallyLoadedModuleNames.AddRange(
+
+        PrivateIncludePathModuleNames.AddRange(
+            new string[] {
+                            "Settings",
+                            "IntroTutorials",
+                            "AssetTools",
+                            "LevelEditor"
+            }
+            );
+
+        DynamicallyLoadedModuleNames.AddRange(
 			new string[]
 			{
-				// ... add any modules that your module loads dynamically here ...
-			}
+                "AssetTools"
+            }
 			);
 	}
 }
