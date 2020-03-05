@@ -11,27 +11,42 @@ struct FAnimNode_MotionMatching : public FAnimNode_Base
 	GENERATED_BODY()
 
 public:
-	FAnimNode_MotionMatching();
+	FAnimNode_MotionMatching() : FAnimNode_Base() {	}
 
 	virtual bool NeedsOnInitializeAnimInstance() const override { return true; }
 	virtual void OnInitializeAnimInstance(const FAnimInstanceProxy* InProxy, const UAnimInstance* InAnimInstance) override;
 	virtual void Evaluate_AnyThread(FPoseContext& Output) override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Parameters, meta = (PinShownByDefault))
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float AnimationSampling = 0.05f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Parameters, meta = (PinShownByDefault))
-	float MaxSequenceLength = 2.0f;
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
+	float Trajectory = 1.0f;
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
+	float Pose = 1.0f;
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
+	float MaxSequenceLength = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = MotionData)
+	UPROPERTY(EditAnywhere, Category = MotionData)
 	UAnimSequence* AnimationSequence = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = MotionData)
+	TArray<FName> BoneNames;
 
 private:
 	FAnimKey FindLowestCostAnimKey();
-	FVector CalculateCurrentTrajectory();
+	float ComputeTrajectoryCost(float AnimTime) const;
+	float ComputePoseCost(float AnimTime) const;
+	FVector CalculateCurrentTrajectory() const;
+	FTransform GetBoneToRootTransform(float AnimTime, int32 BoneIndex) const;
 
-	USkeletalMeshComponent* SkeletalMesh = nullptr;
+	void DrawDebugAnimationPose();
+	void DrawDebugSkeletalMeshPose();
+	void DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset);
+
+	USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 	APawn* OwnerPawn = nullptr;
 	UWorld* World = nullptr;
 	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f};
+	float CurrentAnimTime = 0.0f;
 
 };
