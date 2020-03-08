@@ -38,6 +38,7 @@ private:
 	float ComputePoseCost(float AnimTime) const;
 	FVector CalculateCurrentTrajectory() const;
 	FTransform GetBoneToRootTransform(float AnimTime, int32 BoneIndex) const;
+	void MoveOwnerPawn();
 
 	void DrawDebugAnimationPose();
 	void DrawDebugSkeletalMeshPose();

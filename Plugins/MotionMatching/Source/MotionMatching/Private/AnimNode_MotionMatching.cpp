@@ -103,6 +103,7 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 		ResetCounter();
 		CurrentAnimTime = 0.0f;
 		LowestCostAnimkey = lowestCostAnimKey;
+		MoveOwnerPawn();
 	}
 
 	AnimationSequence->GetAnimationPose(Output.Pose, Output.Curve,
@@ -143,10 +144,10 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 		}
 	}
 
-	if (lowestCostAnimStartTime != LowestCostAnimkey.AnimationStartTime)
-	{
-		ResetCounter();
-	}
+#if DEBUG_DRAW
+	const FTransform rootMotion = AnimationSequence->ExtractRootMotion(lowestCostAnimStartTime, AnimationSampling, false);
+	DrawDebugTrajectory(World, SkeletalMeshComponent, rootMotion.GetTranslation() * 50, FColor::Red);
+#endif //DEBUG_DRAW
 
 	return FAnimKey{0, lowestCostAnimStartTime};
 }
@@ -232,6 +233,26 @@ FTransform FAnimNode_MotionMatching::GetBoneToRootTransform(float AnimTime, int3
 	AnimationSequence->GetBoneTransform(boneTransform, BoneIndex, AnimTime, false);
 
 	return rootTransform.GetRelativeTransform(boneTransform);
+}
+
+void FAnimNode_MotionMatching::MoveOwnerPawn()
+{
+	if (!OwnerPawn || !AnimationSequence)
+	{
+#if !WITH_EDITOR
+		ensureMsgf(OwnerPawn, TEXT("OwnerPawn is nullptr"));
+		ensureMsgf(AnimationSequence, TEXT("AnimationSequence is nullptr"));
+#endif //WITH_EDITOR
+
+		return;
+	}
+
+	const FTransform rootMotion = AnimationSequence->ExtractRootMotion(LowestCostAnimkey.AnimationStartTime, AnimationSampling, false);
+	OwnerPawn->AddMovementInput(rootMotion.GetTranslation());
+
+#if DEBUG_DRAW
+	DrawDebugTrajectory(World, SkeletalMeshComponent, rootMotion.GetTranslation() * 50, FColor::Green);
+#endif //DEBUG_DRAW
 }
 
 void FAnimNode_MotionMatching::DrawDebugAnimationPose()
