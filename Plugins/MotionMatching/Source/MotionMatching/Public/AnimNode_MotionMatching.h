@@ -17,6 +17,7 @@ public:
 	virtual void OnInitializeAnimInstance(const FAnimInstanceProxy* InProxy, const UAnimInstance* InAnimInstance) override;
 	virtual void Evaluate_AnyThread(FPoseContext& Output) override;
 
+
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float AnimationSampling = 0.05f;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
@@ -38,7 +39,7 @@ private:
 	float ComputePoseCost(float AnimTime) const;
 	FVector CalculateCurrentTrajectory() const;
 	FTransform GetBoneToRootTransform(float AnimTime, int32 BoneIndex) const;
-	void MoveOwnerPawn();
+	void MoveOwnerPawn() const;
 
 	void DrawDebugAnimationPose();
 	void DrawDebugSkeletalMeshPose();

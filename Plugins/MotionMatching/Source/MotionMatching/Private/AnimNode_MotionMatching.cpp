@@ -2,6 +2,7 @@
 #include "Animation/AnimInstance.h"
 #include "DrawDebugHelpers.h"
 #include "Animation/AnimSequence.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 #define DEBUG_DRAW 0
 
@@ -95,23 +96,28 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 		return;
 	}
 
-	CurrentAnimTime = CountTo(MaxSequenceLength, AnimationSampling);
+#if DEBUG_DRAW
+	const FVector currentTrajectory = CalculateCurrentTrajectory();
+	DrawDebugTrajectory(World, SkeletalMeshComponent, currentTrajectory * 50, FColor::Red);
+#endif //DEBUG_DRAW
 
-	FAnimKey lowestCostAnimKey = FindLowestCostAnimKey();
-	if (LowestCostAnimkey != lowestCostAnimKey)
+	if (CurrentAnimTime == 0)
 	{
-		ResetCounter();
-		CurrentAnimTime = 0.0f;
-		LowestCostAnimkey = lowestCostAnimKey;
-		MoveOwnerPawn();
+		LowestCostAnimkey = FindLowestCostAnimKey();
 	}
 
-	AnimationSequence->GetAnimationPose(Output.Pose, Output.Curve,
-		FAnimExtractContext(LowestCostAnimkey.AnimationStartTime + CurrentAnimTime, true));
+	const float& animationTime = LowestCostAnimkey.AnimationStartTime + CurrentAnimTime;
+	AnimationSequence->GetAnimationPose(Output.Pose, Output.Curve, FAnimExtractContext(animationTime, true));
+	
+	MoveOwnerPawn();
+
+	CurrentAnimTime = CountTo(MaxSequenceLength, AnimationSampling);
 
 #if DEBUG_DRAW
-	DrawDebugAnimationPose();
-	DrawDebugSkeletalMeshPose();
+	const FTransform& animTransform = AnimationSequence->ExtractRootMotion(LowestCostAnimkey.AnimationStartTime + MaxSequenceLength, AnimationSampling, true);
+	FTransform worldAnimTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(animTransform);
+	const FVector& animTranslation = worldAnimTransform.GetTranslation();
+	DrawDebugTrajectory(World, SkeletalMeshComponent, animTranslation * 50, FColor::Blue);
 #endif //DEBUG_DRAW
 }
 
@@ -137,7 +143,7 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 		currentAnimCost += Trajectory * ComputeTrajectoryCost(animTime); 
 		currentAnimCost += Pose * ComputePoseCost(animTime); 
 
-		if (lowestAnimCost > currentAnimCost && animTime != LowestCostAnimkey.AnimationStartTime)
+		if (lowestAnimCost > currentAnimCost)
 		{
 			lowestAnimCost = currentAnimCost;
 			lowestCostAnimStartTime = animTime;
@@ -164,10 +170,12 @@ float FAnimNode_MotionMatching::ComputeTrajectoryCost(float AnimTime) const
 		return 0.0f;
 	}
 
-	const FVector currentTrajectory = CalculateCurrentTrajectory();
-	const FTransform& animTransform = AnimationSequence->ExtractRootMotion(AnimTime, AnimationSampling, false);
+	const FVector& currentTrajectory = CalculateCurrentTrajectory();
+	const FTransform& animTransform = AnimationSequence->ExtractRootMotion(AnimTime, AnimationSampling, true);
+	const FTransform& worldAnimTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(animTransform);
+	const FVector& animTranslation = worldAnimTransform.GetTranslation();
 
-	return FVector::Dist(currentTrajectory, animTransform.GetTranslation());
+	return FVector::Dist(currentTrajectory, animTranslation);
 }
 
 float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime) const
@@ -235,23 +243,32 @@ FTransform FAnimNode_MotionMatching::GetBoneToRootTransform(float AnimTime, int3
 	return rootTransform.GetRelativeTransform(boneTransform);
 }
 
-void FAnimNode_MotionMatching::MoveOwnerPawn()
+void FAnimNode_MotionMatching::MoveOwnerPawn() const
 {
-	if (!OwnerPawn || !AnimationSequence)
+	if (!OwnerPawn || !AnimationSequence || !SkeletalMeshComponent)
 	{
 #if !WITH_EDITOR
 		ensureMsgf(OwnerPawn, TEXT("OwnerPawn is nullptr"));
 		ensureMsgf(AnimationSequence, TEXT("AnimationSequence is nullptr"));
+		ensureMsgf(SkeletalMeshComponent, TEXT("SkeletalMeshComponent is nullptr"));
 #endif //WITH_EDITOR
 
 		return;
 	}
 
-	const FTransform rootMotion = AnimationSequence->ExtractRootMotion(LowestCostAnimkey.AnimationStartTime, AnimationSampling, false);
-	OwnerPawn->AddMovementInput(rootMotion.GetTranslation());
+	const float currentAnimationTime = LowestCostAnimkey.AnimationStartTime + CurrentAnimTime;
+	const FTransform& rootMotion = AnimationSequence->ExtractRootMotion(currentAnimationTime, AnimationSampling, true);
+
+	UCharacterMovementComponent* ownerPawnMovementComponent = Cast<UCharacterMovementComponent>(OwnerPawn->GetMovementComponent());
+		
+	if (ownerPawnMovementComponent)
+	{
+		// character movement component should convert the root motion to the world coordinates:
+		ownerPawnMovementComponent->RootMotionParams.Set(rootMotion); 
+	}
 
 #if DEBUG_DRAW
-	DrawDebugTrajectory(World, SkeletalMeshComponent, rootMotion.GetTranslation() * 50, FColor::Green);
+	DrawDebugTrajectory(World, SkeletalMeshComponent, SkeletalMeshComponent->ConvertLocalRootMotionToWorld(rootMotion).GetTranslation() * 50, FColor::Green);
 #endif //DEBUG_DRAW
 }
 
