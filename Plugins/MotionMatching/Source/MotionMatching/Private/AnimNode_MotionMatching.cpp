@@ -73,7 +73,7 @@ void FAnimNode_MotionMatching::Update_AnyThread(const FAnimationUpdateContext& C
 
 void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 {
-	if (!AnimationSequence)
+	if (!AnimationSequence || !SkeletalMeshComponent)
 	{
 		ensureMsgf(false, TEXT("Animation sequence is nullptr"));
 
@@ -138,19 +138,26 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 	float lowestCostAnimStartTime = -1.0f;
 	uint32 currentKeyIndex = 0;
 	uint32 lowestCostKeyIndex = 0;
+	CurrentTrajectory = CalculateCurrentTrajectory();
 
 	for (float animTime = 0.0f; animTime < (animLength - (AnimationSampling * NumberOfStepsToMatch)); animTime += AnimationSampling)
 	{
 		float currentAnimCost = 0.0f;
+		const FTransform& rootMotion = AnimationSequence->ExtractRootMotion(animTime, UpdateRate, true);
 
-		if (Trajectory > 0)
+		if (TrajectoryWeight > 0)
 		{
-			currentAnimCost += Trajectory * ComputeTrajectoryCost(animTime);
+			currentAnimCost += TrajectoryWeight * ComputeTrajectoryCost(animTime, rootMotion);
 		}
 
-		if (Pose > 0)
+		if (PoseWeight > 0)
 		{
-			currentAnimCost += Pose * ComputePoseCost(animTime, currentKeyIndex);
+			currentAnimCost += PoseWeight * ComputePoseCost(animTime, currentKeyIndex);
+		}
+
+		if (OrientationWeight > 0)
+		{
+			currentAnimCost += OrientationWeight * ComputeOrientationCost(animTime, rootMotion);
 		}
 
 		if (lowestAnimCost > currentAnimCost)
@@ -185,7 +192,7 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 }
 
 
-float FAnimNode_MotionMatching::ComputeTrajectoryCost(float AnimTime) const 
+float FAnimNode_MotionMatching::ComputeTrajectoryCost(float AnimTime, const FTransform& RootMotion) const 
 {
 	if (!AnimationSequence)
 	{
@@ -196,13 +203,10 @@ float FAnimNode_MotionMatching::ComputeTrajectoryCost(float AnimTime) const
 		return 0.0f;
 	}
 
-	FVector currentTrajectory = CalculateCurrentTrajectory();
-	
-	const FTransform& animTransform = AnimationSequence->ExtractRootMotion(AnimTime, UpdateRate, true);
-	const FTransform& worldAnimTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(animTransform);
+	const FTransform& worldAnimTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(RootMotion);
 	FVector animTranslation = worldAnimTransform.GetTranslation();
 	
-	return FVector::Dist(currentTrajectory, animTranslation);
+	return FVector::Dist(CurrentTrajectory, animTranslation);
 }
 
 float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex) const
@@ -219,6 +223,8 @@ float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex)
 	}
 
 	float Cost = 0.0f;
+
+	//TODO: consider using USkinnedMeshComponent::TransformToBoneSpace
 
 	FTransform skeletalMeshTransform = OwnerPawn->GetActorTransform();
 	FTransform rootSkeletalTransform = SkeletalMeshComponent->GetBoneTransform(0);
@@ -250,6 +256,20 @@ float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex)
 	}
 
 	return Cost;
+}
+
+float FAnimNode_MotionMatching::ComputeOrientationCost(float AnimTime, const FTransform& RootMotion) const
+{
+	if (AnimTime + UpdateRate > AnimationSequence->SequenceLength)
+	{
+		return BIG_NUMBER;
+	}
+
+	const FTransform& rootMotion = AnimationSequence->ExtractRootMotion(AnimTime, UpdateRate, true);
+	const FTransform& rootSkeletalTransform = SkeletalMeshComponent->GetBoneTransform(0) * RootMotion;
+	const FVector& orientation = rootSkeletalTransform.GetRotation().Vector().RotateAngleAxis(90.0f, FVector{ 0.0f, 0.0f, 1.0f });
+
+	return FVector::Dist(orientation, CurrentTrajectory);
 }
 
 FVector FAnimNode_MotionMatching::CalculateCurrentTrajectory() const
@@ -320,7 +340,7 @@ void FAnimNode_MotionMatching::DrawDebugAnimationPose()
 			indexBoneTransform *= rootToPelvisSkeletalTransform;
 			FTransform transformedBoneOnMeshTransform = indexBoneTransform * skeletalMeshTransform;
 			FVector transformedBoneOnMeshTranslation = transformedBoneOnMeshTransform.GetTranslation();
-			DrawDebugPoint(World, transformedBoneOnMeshTranslation, 3, FColor::Orange, false, DebugLinesLifetime, 0);
+			DrawDebugPoint(World, transformedBoneOnMeshTranslation, 10, FColor::Red, false, DebugLinesLifetime, 0);
 		}
 	}
 }
@@ -389,7 +409,7 @@ void FAnimNode_MotionMatching::DrawDebugBoneToRootPosition(float AnimTime, FColo
 	}
 }
 
-void FAnimNode_MotionMatching::DrawDebugTrajectory(const FVector& CurrentTrajectory, const FColor& Color)
+void FAnimNode_MotionMatching::DrawDebugTrajectory(const FVector& Trajectory, const FColor& Color) const
 {
 	if (!World || !SkeletalMeshComponent)
 	{
@@ -402,7 +422,7 @@ void FAnimNode_MotionMatching::DrawDebugTrajectory(const FVector& CurrentTraject
 	}
 
 	const FVector& skeletalMeshLocation = SkeletalMeshComponent->GetComponentLocation();
-	UKismetSystemLibrary::DrawDebugLine(World, skeletalMeshLocation, skeletalMeshLocation + (CurrentTrajectory * 10), Color, DebugLinesLifetime, 2.0f);
+	UKismetSystemLibrary::DrawDebugLine(World, skeletalMeshLocation, skeletalMeshLocation + (Trajectory * 10), Color, DebugLinesLifetime, 2.0f);
 }
 
 void FAnimNode_MotionMatching::LoadBoneToRootTransforms()
