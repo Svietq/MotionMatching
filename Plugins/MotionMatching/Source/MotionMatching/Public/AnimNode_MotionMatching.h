@@ -21,9 +21,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float AnimationSampling = 0.05f;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
-	float Trajectory = 1.0f;
+	float TrajectoryWeight = 1.0f;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
-	float Pose = 1.0f;
+	float PoseWeight = 1.0f;
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
+	float OrientationWeight = 1.0f;
 
 	//TODO: NumberOfStepsToMatch and TrajectoryLength might not be needed anymore after adding velocity matching,
 	//      and changing new trajectory computation to compare vector's rotations instead of distances
@@ -54,15 +56,16 @@ public:
 
 private:
 	FAnimKey FindLowestCostAnimKey();
-	float ComputeTrajectoryCost(float AnimTime) const;
+	float ComputeTrajectoryCost(float AnimTime, const FTransform& RootMotion) const;
 	float ComputePoseCost(float AnimTime, uint32 KeyIndex) const;
+	float ComputeOrientationCost(float AnimTime, const FTransform& RootMotion) const;
 	FVector CalculateCurrentTrajectory() const;
 	void MoveOwnerPawn() const;
 	void DrawDebugAnimationPose();
 	void DrawDebugSkeletalMeshPose();
 	void DrawDebugSkeletalMeshBoneToRootPosition();
 	void DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset, uint32 KeyIndex);
-	void DrawDebugTrajectory(const FVector& CurrentTrajectory, const FColor& Color = FColor::Green);
+	void DrawDebugTrajectory(const FVector& Trajectory, const FColor& Color = FColor::Green) const;
 
 	USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 	APawn* OwnerPawn = nullptr;
@@ -70,6 +73,7 @@ private:
 	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f, 0u};
 	float PreviousAnimTime = 0.0f;
 	float GlobalDeltaTime = 0.0f;
+	FVector CurrentTrajectory;
 
 	//TODO: Make LoadBoneToRootTransforms and GetLoadedBoneToRootTransform more generic
 	void LoadBoneToRootTransforms();
