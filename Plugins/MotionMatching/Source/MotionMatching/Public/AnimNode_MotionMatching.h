@@ -57,27 +57,27 @@ public:
 private:
 	FAnimKey FindLowestCostAnimKey();
 	float ComputeTrajectoryCost(float AnimTime, const FTransform& RootMotion) const;
-	float ComputePoseCost(float AnimTime, uint32 KeyIndex) const;
+	float ComputePoseCost(float AnimTime) const;
 	float ComputeOrientationCost(float AnimTime, const FTransform& RootMotion) const;
 	FVector CalculateCurrentTrajectory() const;
 	void MoveOwnerPawn() const;
 	void DrawDebugAnimationPose();
 	void DrawDebugSkeletalMeshPose();
 	void DrawDebugSkeletalMeshBoneToRootPosition();
-	void DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset, uint32 KeyIndex);
+	void DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset);
 	void DrawDebugTrajectory(const FVector& Trajectory, const FColor& Color = FColor::Green) const;
 
 	USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 	APawn* OwnerPawn = nullptr;
 	UWorld* World = nullptr;
-	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f, 0u};
+	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f};
 	float PreviousAnimTime = 0.0f;
 	float GlobalDeltaTime = 0.0f;
 	FVector CurrentTrajectory;
 
 	//TODO: Make LoadBoneToRootTransforms and GetLoadedBoneToRootTransform more generic
 	void LoadBoneToRootTransforms();
-	FTransform GetLoadedBoneToRootTransform(float AnimTime, int32 BoneIndex, uint32 KeyIndex) const;
+	FTransform GetLoadedBoneToRootTransform(float AnimTime, int32 BoneIndex) const;
 
 	TArray<FTransform> FootLeftToRootTransforms;
 	TArray<FTransform> FootRightToRootTransforms;

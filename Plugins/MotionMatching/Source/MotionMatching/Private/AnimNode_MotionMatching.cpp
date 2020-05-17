@@ -107,9 +107,8 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 				
 		if (IsDebugMode)
 		{
-			uint32 currentKeyIndex = LowestCostAnimkey.KeyIndex;
-			DrawDebugBoneToRootPosition(PreviousAnimTime, FColor::Red, FVector{ 0, 0, 0 }, FMath::Clamp<uint32>(currentKeyIndex - 1, 0u, currentKeyIndex));
-			DrawDebugBoneToRootPosition(LowestCostAnimkey.AnimationStartTime + UpdateTimer, FColor::Blue, FVector{ 0, 0, 0 }, currentKeyIndex);
+			DrawDebugBoneToRootPosition(PreviousAnimTime, FColor::Red, FVector{ 0, 0, 0 });
+			DrawDebugBoneToRootPosition(LowestCostAnimkey.AnimationStartTime + UpdateTimer, FColor::Blue, FVector{ 0, 0, 0 });
 			DrawDebugSkeletalMeshBoneToRootPosition();
 		}
 
@@ -136,8 +135,6 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 	const float animLength = AnimationSequence->SequenceLength;
 	float lowestAnimCost = BIG_NUMBER;
 	float lowestCostAnimStartTime = -1.0f;
-	uint32 currentKeyIndex = 0;
-	uint32 lowestCostKeyIndex = 0;
 	CurrentTrajectory = CalculateCurrentTrajectory();
 
 	for (float animTime = 0.0f; animTime < (animLength - (AnimationSampling * NumberOfStepsToMatch)); animTime += AnimationSampling)
@@ -152,7 +149,7 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 
 		if (PoseWeight > 0)
 		{
-			currentAnimCost += PoseWeight * ComputePoseCost(animTime, currentKeyIndex);
+			currentAnimCost += PoseWeight * ComputePoseCost(animTime);
 		}
 
 		if (OrientationWeight > 0)
@@ -164,7 +161,6 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 		{
 			lowestAnimCost = currentAnimCost;
 			lowestCostAnimStartTime = animTime;
-			lowestCostKeyIndex = currentKeyIndex;
 
 			if(IsDebugMode)
 			{
@@ -174,12 +170,9 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 				UE_LOG(LogTemp, Warning, TEXT("LowestCostAnimkey.AnimationStartTime + UpdateTimer: %f"), LowestCostAnimkey.AnimationStartTime + UpdateTimer);
 				UE_LOG(LogTemp, Warning, TEXT("LowestCostAnimkey.AnimationStartTime: %f"), LowestCostAnimkey.AnimationStartTime);
 				UE_LOG(LogTemp, Warning, TEXT("UpdateTimer: %f"), UpdateTimer);
-				UE_LOG(LogTemp, Warning, TEXT("CurrentKeyIndex: %d"), LowestCostAnimkey.KeyIndex);
 				UE_LOG(LogTemp, Warning, TEXT("----------------------------------------"));
 			}
 		}
-
-		++currentKeyIndex;
 	}
 	
 	if (IsDebugMode)
@@ -188,7 +181,7 @@ FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
 		UE_LOG(LogTemp, Warning, TEXT("The lowestCostAnimStartTime: %f"), lowestCostAnimStartTime);
 	}
 
-	return FAnimKey{0, lowestCostAnimStartTime, lowestCostKeyIndex};
+	return FAnimKey{0, lowestCostAnimStartTime};
 }
 
 
@@ -209,7 +202,7 @@ float FAnimNode_MotionMatching::ComputeTrajectoryCost(float AnimTime, const FTra
 	return FVector::Dist(CurrentTrajectory, animTranslation);
 }
 
-float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex) const
+float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime) const
 {
 	if (!AnimationSequence || !SkeletalMeshComponent || BoneNames.Num() == 0)
 	{
@@ -225,13 +218,13 @@ float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex)
 	float Cost = 0.0f;
 
 	//TODO: consider using USkinnedMeshComponent::TransformToBoneSpace
-
+	
 	FTransform skeletalMeshTransform = OwnerPawn->GetActorTransform();
 	FTransform rootSkeletalTransform = SkeletalMeshComponent->GetBoneTransform(0);
 	FTransform rootToPelvisSkeletalTransform = rootSkeletalTransform.GetRelativeTransform(skeletalMeshTransform);
 
 	const int32 rootBoneIndex = SkeletalMeshComponent->GetBoneIndex(RootBoneName);
-	FTransform newPoseRootTransform = GetLoadedBoneToRootTransform(AnimTime, rootBoneIndex, KeyIndex);
+	FTransform newPoseRootTransform = GetLoadedBoneToRootTransform(AnimTime, rootBoneIndex);
 	newPoseRootTransform *= rootToPelvisSkeletalTransform;
 	newPoseRootTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(newPoseRootTransform);
 
@@ -239,15 +232,13 @@ float FAnimNode_MotionMatching::ComputePoseCost(float AnimTime, uint32 KeyIndex)
 	{
 		const int32 boneIndex = SkeletalMeshComponent->GetBoneIndex(boneName);
 
-		FTransform newBoneTransform = GetLoadedBoneToRootTransform(AnimTime, boneIndex, KeyIndex);
+		FTransform newBoneTransform = GetLoadedBoneToRootTransform(AnimTime, boneIndex);
 		newBoneTransform *= rootToPelvisSkeletalTransform;
 		newBoneTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(newBoneTransform);
 		const FVector newBoneToRootTranslation = newBoneTransform.GetTranslation();
 
 		
-		const uint32 maxKeyIndex = uint32((AnimationSequence->SequenceLength / AnimationSampling) - (AnimationSampling * NumberOfStepsToMatch)); //TODO: fix maxKeyIndex
-
-		FTransform previousBoneTransform = GetLoadedBoneToRootTransform(PreviousAnimTime, boneIndex, FMath::Clamp( uint32(PreviousAnimTime/AnimationSampling), 0u, maxKeyIndex));
+		FTransform previousBoneTransform = GetLoadedBoneToRootTransform(PreviousAnimTime, boneIndex);
 		previousBoneTransform *= rootToPelvisSkeletalTransform;
 		previousBoneTransform = SkeletalMeshComponent->ConvertLocalRootMotionToWorld(previousBoneTransform);
 		const FVector previousBoneToRootTranslation = previousBoneTransform.GetTranslation();
@@ -379,7 +370,7 @@ void FAnimNode_MotionMatching::DrawDebugSkeletalMeshBoneToRootPosition()
 
 }
 
-void FAnimNode_MotionMatching::DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset, uint32 KeyIndex)
+void FAnimNode_MotionMatching::DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset)
 {
 	if (!OwnerPawn || !SkeletalMeshComponent)
 	{
@@ -392,14 +383,14 @@ void FAnimNode_MotionMatching::DrawDebugBoneToRootPosition(float AnimTime, FColo
 
 	FTransform newPoseRootTransform;
 	const int32 rootBoneIndex = SkeletalMeshComponent->GetBoneIndex(RootBoneName);
-	newPoseRootTransform = GetLoadedBoneToRootTransform(AnimTime, rootBoneIndex, LowestCostAnimkey.KeyIndex);
+	newPoseRootTransform = GetLoadedBoneToRootTransform(AnimTime, rootBoneIndex);
 	newPoseRootTransform *= rootToPelvisSkeletalTransform;
 	newPoseRootTransform *= skeletalMeshTransform;
 
 	for (const FName& boneName : BoneNames)
 	{
 		const int32 boneIndex = SkeletalMeshComponent->GetBoneIndex(boneName);
-		FTransform indexBoneTransform = GetLoadedBoneToRootTransform(AnimTime, boneIndex, LowestCostAnimkey.KeyIndex);
+		FTransform indexBoneTransform = GetLoadedBoneToRootTransform(AnimTime, boneIndex);
 		indexBoneTransform *= rootToPelvisSkeletalTransform;
 		indexBoneTransform *= skeletalMeshTransform;
 		FTransform transformedBoneOnMeshTransform = indexBoneTransform;
@@ -452,38 +443,47 @@ void FAnimNode_MotionMatching::LoadBoneToRootTransforms()
 	}
 }
 
-FTransform FAnimNode_MotionMatching::GetLoadedBoneToRootTransform(float AnimTime, int32 BoneIndex, uint32 KeyIndex) const
+FTransform FAnimNode_MotionMatching::GetLoadedBoneToRootTransform(float AnimTime, int32 BoneIndex) const
 {
+	const int32 keyIndex = static_cast<int32>(AnimTime / AnimationSampling);
+
+	if (!FootLeftToRootTransforms.IsValidIndex(keyIndex))
+	{
+		ensureMsgf(false, TEXT("Current key index does not match any preloaded bone to root transform"));
+
+		return FTransform::Identity;
+	}
+
 	const int32 FootLeftIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("foot_l")));
 	const int32 FootRightIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("foot_r")));
 	const int32 HeadIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("head")));
 	const int32 HandLeftIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("hand_l")));
 	const int32 HandRightIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("hand_r")));
 	const int32 PelvisIndex = SkeletalMeshComponent->GetBoneIndex(FName(TEXT("pelvis")));
-
+	
 	if (BoneIndex == FootLeftIndex)
 	{
-		return FootLeftToRootTransforms[KeyIndex];
+		return FootLeftToRootTransforms[keyIndex];
 	}
 	else if (BoneIndex == FootRightIndex)
 	{
-		return FootRightToRootTransforms[KeyIndex];
+		return FootRightToRootTransforms[keyIndex];
 	}
 	else if (BoneIndex == HeadIndex)
 	{
-		return HeadToRootTransforms[KeyIndex];
+		return HeadToRootTransforms[keyIndex];
 	}
 	else if (BoneIndex == HandLeftIndex)
 	{
-		return HandLeftToRootTransforms[KeyIndex];
+		return HandLeftToRootTransforms[keyIndex];
 	}
 	else if (BoneIndex == HandRightIndex)
 	{
-		return HandRightToRootTransforms[KeyIndex];
+		return HandRightToRootTransforms[keyIndex];
 	}
 	else if (BoneIndex == PelvisIndex)
 	{
-		return PelvisToRootTransforms[KeyIndex];
+		return PelvisToRootTransforms[keyIndex];
 	}
 
 	return FTransform::Identity;
