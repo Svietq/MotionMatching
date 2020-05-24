@@ -41,7 +41,7 @@ public:
 	float DebugRate = 0.2;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float DebugLinesLifetime = 3.0f;
-
+	
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float UpdateRate = 0.2f;
 	float UpdateTimer = 0.0f;
@@ -53,7 +53,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = MotionData)
 	FName RootBoneName; //TODO: check if this is needed
 
-
 private:
 	FAnimKey FindLowestCostAnimKey();
 	float ComputeTrajectoryCost(float AnimTime, const FTransform& RootMotion) const;
@@ -64,7 +63,6 @@ private:
 	void DrawDebugAnimationPose();
 	void DrawDebugSkeletalMeshPose();
 	void DrawDebugSkeletalMeshBoneToRootPosition();
-	void DrawDebugBoneToRootPosition(float AnimTime, FColor Color, const FVector& Offset);
 	void DrawDebugTrajectory(const FVector& Trajectory, const FColor& Color = FColor::Green) const;
 
 	USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
@@ -77,7 +75,7 @@ private:
 
 	//TODO: Make LoadBoneToRootTransforms and GetLoadedBoneToRootTransform more generic
 	void LoadBoneToRootTransforms();
-	FTransform GetLoadedBoneToRootTransform(float AnimTime, int32 BoneIndex) const;
+	FTransform GetLoadedBoneToRootTransform(const FName& BoneName, float AnimTime) const;
 
 	TArray<FTransform> FootLeftToRootTransforms;
 	TArray<FTransform> FootRightToRootTransforms;
@@ -85,5 +83,12 @@ private:
 	TArray<FTransform> HandLeftToRootTransforms;
 	TArray<FTransform> HandRightToRootTransforms;
 	TArray<FTransform> PelvisToRootTransforms;
+
+	int32 FootLeftIndex = INDEX_NONE;
+	int32 FootRightIndex = INDEX_NONE;
+	int32 HeadIndex = INDEX_NONE; 
+	int32 HandLeftIndex = INDEX_NONE; 
+	int32 HandRightIndex = INDEX_NONE; 
+	int32 PelvisIndex = INDEX_NONE; 
 
 };
