@@ -2,6 +2,9 @@
 
 #include "Animation/AnimNodeBase.h"
 #include "AnimKey.h"
+#include "AnimContainer.h"
+#include "BoneToRootTransforms.h"
+
 #include "AnimNode_MotionMatching.generated.h"
 
 
@@ -27,12 +30,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float OrientationWeight = 1.0f;
 
-	//TODO: NumberOfStepsToMatch and TrajectoryLength might not be needed anymore after adding velocity matching,
-	//      and changing new trajectory computation to compare vector's rotations instead of distances
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
-	int32 NumberOfStepsToMatch = 5;
+	float UpdateRate = 0.2f;
+	float UpdateTimer = 0.0f;
+
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
-	float TrajectoryLength = 2.0f;
+	float TrajectoryLength = 10.0f;
 	
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	bool IsDebugMode = false;
@@ -41,54 +44,32 @@ public:
 	float DebugRate = 0.2;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	float DebugLinesLifetime = 3.0f;
-	
-	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
-	float UpdateRate = 0.2f;
-	float UpdateTimer = 0.0f;
 
 	UPROPERTY(EditAnywhere, Category = MotionData)
-	UAnimSequence* AnimationSequence = nullptr;
+	TArray<UAnimSequence*> AnimationsArray;
+
 	UPROPERTY(EditAnywhere, Category = MotionData)
 	TArray<FName> BoneNames;
-	UPROPERTY(EditAnywhere, Category = MotionData)
-	FName RootBoneName; //TODO: check if this is needed
 
 private:
 	FAnimKey FindLowestCostAnimKey();
-	float ComputeTrajectoryCost(float AnimTime, const FTransform& RootMotion) const;
-	float ComputePoseCost(float AnimTime) const;
+	float ComputeTrajectoryCost(const FTransform& RootMotion) const;
+	float ComputePoseCost() const;
 	float ComputeOrientationCost(float AnimTime, const FTransform& RootMotion) const;
 	FVector CalculateCurrentTrajectory() const;
 	void MoveOwnerPawn() const;
-	void DrawDebugAnimationPose();
-	void DrawDebugSkeletalMeshPose();
-	void DrawDebugSkeletalMeshBoneToRootPosition();
+	void LoadBoneToRootTransforms();
+	FTransform GetLoadedBoneToRootTransform(const FName& BoneName, const FAnimKey& AnimKey) const;
 	void DrawDebugTrajectory(const FVector& Trajectory, const FColor& Color = FColor::Green) const;
 
+	FAnimContainer AnimationContainer;
 	USkeletalMeshComponent* SkeletalMeshComponent = nullptr;
 	APawn* OwnerPawn = nullptr;
 	UWorld* World = nullptr;
 	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f};
-	float PreviousAnimTime = 0.0f;
+	FAnimKey PreviousAnimKey = FAnimKey{ 0, 0.0f };
 	float GlobalDeltaTime = 0.0f;
 	FVector CurrentTrajectory;
-
-	//TODO: Make LoadBoneToRootTransforms and GetLoadedBoneToRootTransform more generic
-	void LoadBoneToRootTransforms();
-	FTransform GetLoadedBoneToRootTransform(const FName& BoneName, float AnimTime) const;
-
-	TArray<FTransform> FootLeftToRootTransforms;
-	TArray<FTransform> FootRightToRootTransforms;
-	TArray<FTransform> HeadToRootTransforms;
-	TArray<FTransform> HandLeftToRootTransforms;
-	TArray<FTransform> HandRightToRootTransforms;
-	TArray<FTransform> PelvisToRootTransforms;
-
-	int32 FootLeftIndex = INDEX_NONE;
-	int32 FootRightIndex = INDEX_NONE;
-	int32 HeadIndex = INDEX_NONE; 
-	int32 HandLeftIndex = INDEX_NONE; 
-	int32 HandRightIndex = INDEX_NONE; 
-	int32 PelvisIndex = INDEX_NONE; 
+	TArray<FBoneToRootTransforms> BoneToRootTransformsArray;
 
 };
