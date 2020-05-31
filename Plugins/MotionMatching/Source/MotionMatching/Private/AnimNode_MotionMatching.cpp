@@ -181,7 +181,7 @@ void FAnimNode_MotionMatching::LoadBoneToRootTransforms()
 
 FTransform FAnimNode_MotionMatching::GetLoadedBoneToRootTransform(const FName& BoneName, const FAnimKey& AnimKey) const
 {
-	const FBoneToRootTransforms& boneToRootTransforms = BoneToRootTransformsArray[AnimationContainer.CurrentKey.Index];
+	const FBoneToRootTransforms& boneToRootTransforms = BoneToRootTransformsArray[AnimKey.Index];
 	const int32 boneIndex = SkeletalMeshComponent->GetBoneIndex(BoneName);
 	const int32 keyIndex = static_cast<int32>(AnimKey.StartTime / AnimationSampling);
 
