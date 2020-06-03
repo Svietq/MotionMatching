@@ -12,13 +12,16 @@ public:
 	void ResetKey();
 	void IncrementKey();
 	FAnimKey MaxKey() const;
-	UAnimSequence& GetAnimation(const FAnimKey& AnimKey) const;
+	const UAnimSequence& GetAnimation(const FAnimKey& AnimKey) const;
+	FTransform ExtractBlendedRootMotion(const FAnimKey& PreviousAnimKey, const FAnimKey& NewAnimKey, float BlendWeight, float DeltaTime) const;
 	FTransform ExtractRootMotion(const FAnimKey& AnimKey, float DeltaTime) const;
-	void GetAnimationPose(FPoseContext& PoseContext, const FAnimKey& AnimKey) const;
+	void GetBlendedPose(FPoseContext& PoseContext, const FAnimKey& PreviousAnimKey, const FAnimKey& NewAnimKey, float BlendWeight) const;
+	void GetPose(FPoseContext& PoseContext, const FAnimKey& AnimKey) const;
 
 	FAnimKey CurrentKey;
 
 private:
 	TArray<UAnimSequence*> AnimationsArray;
 	float AnimationSampling = 0.0f;
+
 };

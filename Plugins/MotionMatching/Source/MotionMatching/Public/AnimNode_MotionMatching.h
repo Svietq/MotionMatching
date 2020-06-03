@@ -38,6 +38,9 @@ public:
 	float TrajectoryLength = 10.0f;
 	
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
+	float BlendWeightDecrement = 0.01f;
+
+	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
 	bool IsDebugMode = false;
 	float DebugTimer = 0.0f;
 	UPROPERTY(EditAnywhere, Category = Parameters, meta = (PinShownByDefault))
@@ -68,8 +71,10 @@ private:
 	UWorld* World = nullptr;
 	FAnimKey LowestCostAnimkey = FAnimKey{0, 0.0f};
 	FAnimKey PreviousAnimKey = FAnimKey{ 0, 0.0f };
+	FAnimKey NewAnimKey = FAnimKey{ 0, 0.0f };
 	float GlobalDeltaTime = 0.0f;
 	FVector CurrentTrajectory;
 	TArray<FBoneToRootTransforms> BoneToRootTransformsArray;
+	float BlendWeight = 1.0f;
 
 };

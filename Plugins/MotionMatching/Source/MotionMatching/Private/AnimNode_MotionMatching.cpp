@@ -25,7 +25,7 @@ void FAnimNode_MotionMatching::OnInitializeAnimInstance(const FAnimInstanceProxy
 
 void FAnimNode_MotionMatching::Update_AnyThread(const FAnimationUpdateContext& Context)
 {
-	const float deltaTime = Context.GetDeltaTime();
+	const float deltaTime = Context.GetDeltaTime(); 
 
 	GlobalDeltaTime = deltaTime;
 	DebugTimer += deltaTime;
@@ -40,7 +40,7 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 {
 	if (!SkeletalMeshComponent)
 	{
-		ensureMsgf(false, TEXT("Animation sequence is nullptr"));
+		ensureMsgf(false, TEXT("SkeletalMeshComponent is nullptr"));
 
 		return;
 	}
@@ -50,8 +50,10 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 		DebugTimer = 0.0f;
 		if (UpdateTimer > UpdateRate)
 		{
+			PreviousAnimKey = NewAnimKey;
 			LowestCostAnimkey = FindLowestCostAnimKey();
 			UpdateTimer = 0.0f;
+			BlendWeight = 1.0f;
 
 			if(IsDebugMode)
 			{
@@ -64,14 +66,12 @@ void FAnimNode_MotionMatching::Evaluate_AnyThread(FPoseContext& Output)
 			}
 		}
 
-		AnimationContainer.GetAnimationPose(Output, FAnimKey{ LowestCostAnimkey.Index, LowestCostAnimkey.StartTime + UpdateTimer });
+		NewAnimKey = FAnimKey{ LowestCostAnimkey.Index, LowestCostAnimkey.StartTime + UpdateTimer };
 		MoveOwnerPawn();
-		PreviousAnimKey = FAnimKey{ LowestCostAnimkey.Index, LowestCostAnimkey.StartTime + UpdateTimer };
 	}
-	else
-	{
-		AnimationContainer.GetAnimationPose(Output, FAnimKey{ LowestCostAnimkey.Index, LowestCostAnimkey.StartTime + UpdateTimer });
-	}
+
+	BlendWeight -= BlendWeightDecrement;
+	AnimationContainer.GetBlendedPose(Output, PreviousAnimKey, NewAnimKey, BlendWeight);
 }
 
 FAnimKey FAnimNode_MotionMatching::FindLowestCostAnimKey()
@@ -139,10 +139,10 @@ FVector FAnimNode_MotionMatching::CalculateCurrentTrajectory() const
 		return FVector{1, 1, 1};
 	}
 
-	const FRotator rotation = OwnerPawn->GetControlRotation();
-	const FRotator yawRotation(0, rotation.Yaw, 0);
-	const FVector forwardDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::X);
-	const FVector rightDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::Y);
+	const FRotator& rotation = OwnerPawn->GetControlRotation();
+	const FRotator& yawRotation = FRotator{0, rotation.Yaw, 0};
+	const FVector& forwardDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::X);
+	const FVector& rightDirection = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::Y);
 	const float forwardValue = OwnerPawn->GetInputAxisValue(FName{ "MoveForward" }); //TODO: find a better way of providing input axes names
 	const float rightValue = OwnerPawn->GetInputAxisValue(FName{ "MoveRight" });
 
@@ -160,14 +160,14 @@ void FAnimNode_MotionMatching::MoveOwnerPawn() const
 		return;
 	}
 	
-	const FTransform& rootMotion = AnimationContainer.ExtractRootMotion(FAnimKey{ LowestCostAnimkey.Index, LowestCostAnimkey.StartTime + UpdateTimer }, GlobalDeltaTime);
+	const FTransform& blendedRootMotion = AnimationContainer.ExtractBlendedRootMotion(PreviousAnimKey, NewAnimKey, BlendWeight, GlobalDeltaTime);
 
 	UCharacterMovementComponent* ownerPawnMovementComponent = Cast<UCharacterMovementComponent>(OwnerPawn->GetMovementComponent());
 		
 	if (ownerPawnMovementComponent)
 	{
 		// character movement component should convert the root motion to the world coordinates:
-		ownerPawnMovementComponent->RootMotionParams.Set(rootMotion); 
+		ownerPawnMovementComponent->RootMotionParams.Set(blendedRootMotion);
 	}
 }
 
